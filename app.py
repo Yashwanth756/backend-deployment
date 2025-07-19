@@ -205,18 +205,20 @@ def update_wordsearch_score():
 def update_daily_data():
     data = request.get_json()
     username = data.get('username')
-    daily_data = data.get('dailyData')
+    completeData = data.get('data')
+    print(completeData)
+    dailyData = completeData['dailyData']
     currdayobj = data.get('currDayObj')
-    print('Updating daily data for:', username)
-    print('Daily data:', daily_data)
+    print('Updating daily data for:', completeData)
+    print('Daily data:', dailyData)
     # return jsonify({'status': 'Daily data update endpoint reached'})
 
-    if not username or not daily_data:
+    if not username or not dailyData:
         return jsonify({'error': 'Username and dailyData are required'}), 400
 
     result = collection.update_one(
         { "email": username },
-        { "$set": { "dailyData": daily_data } },
+        { "$set": { "dailyData": dailyData } },
         upsert=True
     )
     print('Update result:', result)
@@ -238,15 +240,16 @@ def update_daily_data():
     for req_field, db_field in FIELD_MAP.items():
         if req_field in currdayobj:
             # Increment field
-            update_fields[db_field] = currdayobj[req_field]
+            update_fields[db_field] = (currdayobj[req_field] +completeData[db_field])// 2  # Average the current and new value
+            
 
     if not update_fields:
         return jsonify({"error": "No valid score fields to update"}), 400
-
+    print(update_fields)
     # Increment the fields in MongoDB
     result = collection.update_one(
         {"email": username},
-        {"$inc": update_fields}
+        {"$set": update_fields}
     )
 
     
