@@ -4,8 +4,8 @@ from pymongo import MongoClient
 from bson.json_util import dumps  # handles ObjectId serialization
 from dotenv import load_dotenv
 import os
-from apikeyManager import APIKeyManager
-
+# from apikeyManager import APIKeyManager
+from apikeyManager import  APIKeyManager
 
 load_dotenv() 
 app = Flask(__name__)
@@ -15,13 +15,11 @@ CORS(app)
 client = MongoClient("mongodb+srv://root:root@cluster0.jt307.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['school']
 collection = db['records']
-keysList = collection.find_one({'email':'apikeys2'})['apikeys']
-print(keysList)
-keysList = list(map(tuple, keysList))
-manager = APIKeyManager(keysList)
-# print(keysList)
-# from assignmentfetching import student_assignment_status
-# Optional: Route to insert activityLog
+manager = APIKeyManager()
+
+@app.route("/get-api-key", methods=["GET"])
+def get_key():
+    return jsonify(manager.get_available_key())
 @app.route('/insertActivityLog', methods=['POST', 'GET'])
 def insert_activity_log():
     activity_log = [
@@ -100,11 +98,11 @@ def update_hints():
     })
 
 
-@app.route('/get-api-key', methods=['GET'])
-def get_api_key():
-    key, model = manager.get_available_key()
-    # print(data)
-    return jsonify({'key':key, 'model':model})
+# @app.route('/get-api-key', methods=['GET'])
+# def get_api_key():
+#     key, model = manager.get_available_key()
+#     # print(data)
+#     return jsonify({'key':key, 'model':model})
 
 @app.route("/increment-score", methods=["POST"])
 def mark_solved_and_update_score():
