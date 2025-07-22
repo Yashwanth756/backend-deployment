@@ -15,7 +15,7 @@ CORS(app)
 client = MongoClient("mongodb+srv://root:root@cluster0.jt307.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['school']
 collection = db['records']
-keysList = collection.find_one({'email':'apikeys'})['apikeys']
+keysList = collection.find_one({'email':'apikeys'})['apikeys2']
 keysList = list(map(tuple, keysList))
 manager = APIKeyManager(keysList)
 # print(keysList)
