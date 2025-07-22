@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 # MongoDB connection
-client = MongoClient("mongodb+srv://root:root@cluster0.jt307.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient("mongodb+srv://vk7688981:root@mrms.5hcrkjf.mongodb.net/?retryWrites=true&w=majority&appName=mrms")
 db = client['school']
 collection = db['records']
 keysList = collection.find_one({'email':'apikeys'})['apikeys']
