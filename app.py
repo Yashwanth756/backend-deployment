@@ -14,9 +14,186 @@ CORS(app)
 # MongoDB connection
 client = MongoClient("mongodb+srv://root:root@cluster0.jt307.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['school']
-collection = db['records']
+collection = db['api']
 manager = APIKeyManager()
 
+
+@app.route('/get-wordSearchId', methods=['GET'])
+def get_wordSearchId():
+    email = request.args.get('email')
+    level = request.args.get('level')
+    user = collection.find_one({'email': email})
+    if user:
+        return jsonify({'id': user['wordsearch'][level]['offset']})
+    else:   
+        return jsonify({'error': 'User not found'}), 404
+
+@app.route('/increment-wordSearch', methods=['GET'])
+def increment_wordSearch():
+    username = request.args.get('email')
+    level = request.args.get('level')
+    
+    result = collection.update_one(
+        {'email': username},
+        {"$inc": {"wordsearch."+level+".offset": 10}}
+    )
+    if result.modified_count > 0:
+        print('Incremented vocabularyArchade for:', username)
+        return jsonify({'status': 'success', 'message': 'vocabularyArchade id incremented'})
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+@app.route('/clear-wordSearchData', methods=['GET'])
+def clear_wordSearchData():
+    email = request.args.get('email')
+    level = request.args.get('level')
+    user = collection.find_one({'email': email})
+    if user:
+        result = collection.update_one(
+            { 'email':email},
+            {'$set':{'wordsearch.'+level+'.words':[]}}
+        )
+        print(result)
+        if result.modified_count > 0:
+            return jsonify({'status': 'success', 'message': 'data cleared'})
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+        
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+
+@app.route('/get-vocabularyArchadeId', methods=['GET'])
+def get_vocabularyArchadeId():
+    email = request.args.get('email')
+    level = request.args.get('level')
+    user = collection.find_one({'email': email})
+    print(user['vocabularyArchade'][level]['offset'])
+    if user:
+        return jsonify({'id': user['vocabularyArchade'][level]['offset']})
+    else:   
+        return jsonify({'error': 'User not found'}), 404
+
+@app.route('/increment-vocabularyArchadeId', methods=['GET'])
+def increment_vocabularyArchadeId():
+    username = request.args.get('email')
+    level = request.args.get('level')
+    
+    result = collection.update_one(
+        {'email': username},
+        {"$inc": {"vocabularyArchade."+level+".offset": 10}}
+    )
+    if result.modified_count > 0:
+        print('Incremented vocabularyArchade for:', username)
+        return jsonify({'status': 'success', 'message': 'vocabularyArchade id incremented'})
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+@app.route('/clear-vocabularyArchadeData', methods=['GET'])
+def clear_vocabularyArchadeData():
+    email = request.args.get('email')
+    level = request.args.get('level')
+    user = collection.find_one({'email': email})
+    if user:
+        result = collection.update_one(
+            { 'email':email},
+            {'$set':{'vocabularyArchade.'+level+'.wordDetails':[]}}
+        )
+        print(result)
+        if result.modified_count > 0:
+            return jsonify({'status': 'success', 'message': 'data cleared'})
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+        
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+
+
+
+
+@app.route('/get-wordScrambleId', methods=['GET'])
+def get_word_scramble_id():
+    email = request.args.get('email')
+    level = request.args.get('level')
+    user = collection.find_one({'email': email})
+    print(user['wordscramble'][level+'Offset'])
+    if user:
+        return jsonify({'id': user['wordscramble'][level+'Offset']})
+    else:   
+        return jsonify({'error': 'User not found'}), 404
+@app.route('/increment-wordScrambleId', methods=['GET'])
+def increment_wordScrambleId():
+    username = request.args.get('email')
+    level = request.args.get('level')
+    
+    result = collection.update_one(
+        {'email': username},
+        {"$inc": {"wordscramble."+level+"Offset": 10}}
+    )
+    if result.modified_count > 0:
+        print('Incremented word scramble id for:', username)
+        return jsonify({'status': 'success', 'message': 'word scramble id incremented'})
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+@app.route('/clear-wordScrambleData', methods=['GET'])
+def clear_wordScramble():
+    email = request.args.get('email')
+    level = request.args.get('level')
+    user = collection.find_one({'email': email})
+    if user:
+        result = collection.update_one(
+            { 'email':email},
+            {'$set':{'wordscramble.'+level:[]}}
+        )
+        print(result)
+        if result.modified_count > 0:
+            return jsonify({'status': 'success', 'message': 'data cleared'})
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+        
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+@app.route('/get-pronunciationMirrorId', methods=['GET'] )
+def get_pronunciation_mirror_id():
+    username = request.args.get('email')
+    level = request.args.get('level')
+
+    user = collection.find_one({'email': username})
+    print(user['pronunciationMirror'+level+'Id'])
+    # print('pronunciationMirroreasyId', 'pronunciationMirror'+level+'Id')
+    if user:
+        return jsonify({'id':user['pronunciationMirror'+level+'Id']})
+    else:   
+        return jsonify({'error': 'User not found'}), 404
+
+@app.route('/increment-pronunciationMirrorId', methods=['GET'])
+def increment_pronunciation_mirror_id():
+    username = request.args.get('email')
+    level = request.args.get('level')
+
+    result = collection.update_one(
+        {'email': username},
+        {"$inc": {"pronunciationMirror"+level+"Id": 1}}
+    )
+    if result.modified_count > 0:
+        print('Incremented pronunciationMirrorId for:', username)
+        return jsonify({'status': 'success', 'message': 'pronunciationMirrorId incremented'})
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
+@app.route('/get-vocabularyTrainerId', methods=['GET'])
+def get_vocabulary_trainer_id():
+    username = request.args.get('email')
+    level = request.args.get('level')
+    user = collection.find_one({'email': username})
+    if user:
+        return jsonify({'id': user['vocabularyTrainer'+level+'Id']})
+    else:   
+        return jsonify({'error': 'User not found'}), 404
+@app.route('/increment-vocabularyTrainerId', methods=['GET'])
+def increment_vocabulary_trainer_id():
+    username = request.args.get('email')
+    level = request.args.get('level')
+    result = collection.update_one({'email': username},
+                                      {"$inc": {"vocabularyTrainer"+level+"Id": 10}})
+    if result.modified_count > 0:
+        print('Incremented vocabularyTrainerId for:', username)
+        return jsonify({'status': 'success', 'message': 'vocabularyTrainerId incremented'})
+    else:
+        return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
 @app.route("/get-api-key", methods=["GET"])
 def get_key():
     return jsonify(manager.get_available_key())
@@ -315,12 +492,13 @@ def get_students():
 @app.route('/update-wordscramble-words', methods=['POST'])
 def update_words():
     data = request.json
-    class_name = data.get('classes')
-    section = data.get('section')
+    # class_name = data.get('classes')
+    # section = data.get('section')
+    email = data.get('email')
     words = data.get('words', [])
 
-    if not class_name or not section:
-        return jsonify({"message": "Missing classes or section"}), 400
+    if not email :
+        return jsonify({"message": "Missing email"}), 400
 
     # Prepare words by difficulty
     difficulty_map = {"easy": [], "medium": [], "hard": []}
@@ -340,10 +518,9 @@ def update_words():
         return jsonify({"message": "No valid words to add"}), 400
 
     # Perform update for all matching users
-    result = collection.update_many(
+    result = collection.update_one(
         {
-            "classes": class_name,
-            "sections": section
+            'email': email
         },
         {
             "$push": update_obj
@@ -365,12 +542,13 @@ DIFFICULTY_MAP = {
 @app.route('/update-vocab', methods=['POST'])
 def update_vocab():
     data = request.json
-    class_name = data.get('classes')
-    section = data.get('section')
+    # class_name = data.get('classes')
+    # section = data.get('section')
+    email = data.get('email')
     words = data.get('words', [])
     print(words)
 
-    if not class_name or not section:
+    if not email:
         return jsonify({"message": "Missing classes or section"}), 400
 
     # Build update instructions
@@ -401,10 +579,9 @@ def update_vocab():
         return jsonify({"message": "No valid words to add"}), 400
 
     # Update all matching students
-    result = collection.update_many(
+    result = collection.update_one(
         {
-            "classes": class_name,
-            "sections": section
+            "email": email
         },
         {
             "$push": push_updates
@@ -419,11 +596,10 @@ def update_vocab():
 @app.route('/update-wordsearch', methods=['POST'])
 def update_wordsearch():
     data = request.json
-    class_name = data.get('classes')
-    section = data.get('section')
+    email = data.get('email')
     words = data.get('words', [])
 
-    if not class_name or not section:
+    if not email:
         return jsonify({"message": "Missing classes or section"}), 400
 
     if not words:
@@ -454,10 +630,9 @@ def update_wordsearch():
         return jsonify({"message": "No valid words to add"}), 400
 
     # Update all matching documents
-    result = collection.update_many(
+    result = collection.update_one(
         {
-            "classes": class_name,
-            "sections": section
+            'email': email
         },
         {
             "$push": push_updates
