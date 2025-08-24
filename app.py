@@ -14,10 +14,156 @@ CORS(app)
 # MongoDB connection
 client = MongoClient("mongodb+srv://root:root@cluster0.jt307.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client['school']
-collection = db['api']
+collection = db['test']
 manager = APIKeyManager()
 
+@app.route('/updateModuleData', methods=['POST'])
+def updateModuleData():
+    data = request.json
+    email = data.get("email")
+    module = data.get("module")   # e.g. "speaking"
+    target = data.get("target")   # new targetSessions
+    classes = data.get("classes", [])
+    sections = data.get("sections", [])
 
+    # Update individual student by email
+    result = collection.update_one(
+        {"email": email},
+        {"$set": {f"module.{module}.targetSessions": target}}
+    )
+    
+    # Reset + update all students in class & section
+    studentModuleUpdate = collection.update_many(
+        {
+            "role": "student",
+            "classes": {"$in": classes},
+            "sections": {"$in": sections}
+        },
+        {
+            "$set": {
+                f"module.{module}.targetSessions": target,
+                f"module.{module}.score": 0,
+                f"module.{module}.sessionsCompleted": 0,
+                f"module.{module}.totalTime": 0
+            }
+        }
+    )
+    if result.modified_count > 0 or studentModuleUpdate.modified_count > 0:
+        return jsonify({
+            "message": f"Module '{module}' target updated and scores reset",
+            "updatedUser": result.modified_count,
+            "updatedStudents": studentModuleUpdate.modified_count
+        }), 200
+    else:
+        return jsonify({"error": "No student found or module invalid"}), 404
+
+@app.route('/getModuleData', methods=['GET'])
+def getModuleData():
+    email = request.args.get('email')
+    user = collection.find_one({'email': email})
+    # print(user, email)
+    if user:
+        return jsonify({'status':'sucess', 'data':user['module']}),  200
+    else:
+        return jsonify({'status':"not data found"}), 400
+
+@app.route('/increment-session', methods=['POST'])
+def increment_session():
+    data = request.json
+    email = data.get("email")
+    module = data.get("module")  # e.g. "speaking" or "vocabulary"
+    score = data.get("score")
+    if not email or not module:
+        return jsonify({"error": "Email and module are required"}), 400
+
+    # increment sessionsCompleted inside module
+    result = collection.update_one(
+        {"email": email},
+        {
+            "$inc": {
+                f"module.{module}.sessionsCompleted": 1,
+                f"module.{module}.score": score
+            }
+        }
+    )
+    if result.modified_count > 0:
+        # updated_user = collection.find_one({"email": email}, {"_id": 0, "email": 1, "module": 1})
+        return jsonify({"message": "Session updated"}), 200
+    else:
+        return jsonify({"error": "User not found or module invalid"}), 404
+@app.route("/students", methods=["POST"])
+def get_students():
+    data = request.json
+    classes = data.get("classes", [])
+    sections = data.get("sections", [])
+
+    # Query for students in given class and section
+    students = collection.find({
+        "role": "student",
+        "classes": {"$in": classes},
+        "sections": {"$in": sections}
+    })
+
+    result = []
+    for student in students:
+        modules = student.get("module", {})
+
+        # Calculate total time spent across all modules
+        total_time = sum([
+            int(modules.get(m, {}).get("totalTime", 0))
+            for m in ["speaking", "vocabulary", "grammar", "pronunciation", "reflex", "story"]
+        ])
+
+        result.append({
+            "id": str(student.get("_id", "")),
+            "username": student.get("email", "").split("@")[0],
+            "fullName": student.get("fullName", ""),
+            "class": student.get("classes", [""])[0],
+            "section": student.get("sections", [""])[0],
+            "modules": {
+                "speaking": {
+                    "score": int(modules.get("speaking", {}).get("score", 0)),
+                    "sessionsCompleted": int(modules.get("speaking", {}).get("sessionsCompleted", 0)),
+                    "targetSessions": int(modules.get("speaking", {}).get("targetSessions", 0)),
+                    "totalTime": int(modules.get("speaking", {}).get("totalTime", 0))
+                },
+                "vocabulary": {
+                    "score": int(modules.get("vocabulary", {}).get("score", 0)),
+                    "sessionsCompleted": int(modules.get("vocabulary", {}).get("sessionsCompleted", 0)),
+                    "targetSessions": int(modules.get("vocabulary", {}).get("targetSessions", 0)),
+                    "totalTime": int(modules.get("vocabulary", {}).get("totalTime", 0))
+                },
+                "grammar": {
+                    "score": int(modules.get("grammar", {}).get("score", 0)),
+                    "sessionsCompleted": int(modules.get("grammar", {}).get("sessionsCompleted", 0)),
+                    "targetSessions": int(modules.get("grammar", {}).get("targetSessions", 0)),
+                    "totalTime": int(modules.get("grammar", {}).get("totalTime", 0))
+                },
+                "pronunciation": {
+                    "score": int(modules.get("pronunciation", {}).get("score", 0)),
+                    "sessionsCompleted": int(modules.get("pronunciation", {}).get("sessionsCompleted", 0)),
+                    "targetSessions": int(modules.get("pronunciation", {}).get("targetSessions", 0)),
+                    "totalTime": int(modules.get("pronunciation", {}).get("totalTime", 0))
+                },
+                "reflex": {
+                    "score": int(modules.get("reflex", {}).get("score", 0)),
+                    "sessionsCompleted": int(modules.get("reflex", {}).get("sessionsCompleted", 0)),
+                    "targetSessions": int(modules.get("reflex", {}).get("targetSessions", 0)),
+                    "totalTime": int(modules.get("reflex", {}).get("totalTime", 0))
+                },
+                "story": {
+                    "score": int(modules.get("story", {}).get("score", 0)),
+                    "sessionsCompleted": int(modules.get("story", {}).get("sessionsCompleted", 0)),
+                    "targetSessions": int(modules.get("story", {}).get("targetSessions", 0)),
+                    "totalTime": int(modules.get("story", {}).get("totalTime", 0))
+                },
+            },
+            "overall": int(student.get("overall", 0)),
+            "totalTimeSpent": total_time,
+            "lastActive": student.get("lastActive", None)  # assuming you store this in doc
+        })
+
+    return jsonify(result)
 @app.route('/get-wordSearchId', methods=['GET'])
 def get_wordSearchId():
     email = request.args.get('email')
@@ -38,7 +184,7 @@ def increment_wordSearch():
         {"$inc": {"wordsearch."+level+".offset": 10}}
     )
     if result.modified_count > 0:
-        print('Incremented vocabularyArchade for:', username)
+        # print('Incremented vocabularyArchade for:', username)
         return jsonify({'status': 'success', 'message': 'vocabularyArchade id incremented'})
     else:
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -52,7 +198,7 @@ def clear_wordSearchData():
             { 'email':email},
             {'$set':{'wordsearch.'+level+'.words':[]}}
         )
-        print(result)
+        # print(result)
         if result.modified_count > 0:
             return jsonify({'status': 'success', 'message': 'data cleared'})
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -65,7 +211,7 @@ def get_vocabularyArchadeId():
     email = request.args.get('email')
     level = request.args.get('level')
     user = collection.find_one({'email': email})
-    print(user['vocabularyArchade'][level]['offset'])
+    # print(user['vocabularyArchade'][level]['offset'])
     if user:
         return jsonify({'id': user['vocabularyArchade'][level]['offset']})
     else:   
@@ -81,7 +227,7 @@ def increment_vocabularyArchadeId():
         {"$inc": {"vocabularyArchade."+level+".offset": 10}}
     )
     if result.modified_count > 0:
-        print('Incremented vocabularyArchade for:', username)
+        # print('Incremented vocabularyArchade for:', username)
         return jsonify({'status': 'success', 'message': 'vocabularyArchade id incremented'})
     else:
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -95,7 +241,7 @@ def clear_vocabularyArchadeData():
             { 'email':email},
             {'$set':{'vocabularyArchade.'+level+'.wordDetails':[]}}
         )
-        print(result)
+        # print(result)
         if result.modified_count > 0:
             return jsonify({'status': 'success', 'message': 'data cleared'})
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -111,7 +257,7 @@ def get_word_scramble_id():
     email = request.args.get('email')
     level = request.args.get('level')
     user = collection.find_one({'email': email})
-    print(user['wordscramble'][level+'Offset'])
+    # print(user['wordscramble'][level+'Offset'])
     if user:
         return jsonify({'id': user['wordscramble'][level+'Offset']})
     else:   
@@ -126,7 +272,7 @@ def increment_wordScrambleId():
         {"$inc": {"wordscramble."+level+"Offset": 10}}
     )
     if result.modified_count > 0:
-        print('Incremented word scramble id for:', username)
+        # print('Incremented word scramble id for:', username)
         return jsonify({'status': 'success', 'message': 'word scramble id incremented'})
     else:
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -140,7 +286,7 @@ def clear_wordScramble():
             { 'email':email},
             {'$set':{'wordscramble.'+level:[]}}
         )
-        print(result)
+        # print(result)
         if result.modified_count > 0:
             return jsonify({'status': 'success', 'message': 'data cleared'})
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -153,7 +299,7 @@ def get_pronunciation_mirror_id():
     level = request.args.get('level')
 
     user = collection.find_one({'email': username})
-    print(user['pronunciationMirror'+level+'Id'])
+    # print(user['pronunciationMirror'+level+'Id'])
     # print('pronunciationMirroreasyId', 'pronunciationMirror'+level+'Id')
     if user:
         return jsonify({'id':user['pronunciationMirror'+level+'Id']})
@@ -170,7 +316,7 @@ def increment_pronunciation_mirror_id():
         {"$inc": {"pronunciationMirror"+level+"Id": 1}}
     )
     if result.modified_count > 0:
-        print('Incremented pronunciationMirrorId for:', username)
+        # print('Incremented pronunciationMirrorId for:', username)
         return jsonify({'status': 'success', 'message': 'pronunciationMirrorId incremented'})
     else:
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -190,7 +336,7 @@ def increment_vocabulary_trainer_id():
     result = collection.update_one({'email': username},
                                       {"$inc": {"vocabularyTrainer"+level+"Id": 10}})
     if result.modified_count > 0:
-        print('Incremented vocabularyTrainerId for:', username)
+        # print('Incremented vocabularyTrainerId for:', username)
         return jsonify({'status': 'success', 'message': 'vocabularyTrainerId incremented'})
     else:
         return jsonify({'status': 'error', 'message': 'User not found or no update made'}), 404
@@ -215,7 +361,7 @@ def insert_activity_log():
         { "$set": { "activityLog": activity_log } },
         upsert=True
     )
-    print('Activity log inserted/updated:', result)
+    # print('Activity log inserted/updated:', result)
     return jsonify({'status': 'Activity log inserted/updated'})
 
 @app.route('/', methods=['GET'])
@@ -231,7 +377,7 @@ def login():
 
     user = collection.find_one({'email': username, 'password': password})
     
-    print('Login attempt by:', username)
+    # print('Login attempt by:', username)
     if user:
         return jsonify({'success': True, 'message': 'Login successful', 'id': user['id'], 'email': user['email'], 'fullName': user['fullName'], 'role': user['role'], 'classes': user['classes'], 'sections': user['sections']})
     else:
@@ -243,7 +389,7 @@ def get_user_data():
     data = request.get_json()
     username = data.get('email')
     user_data = collection.find_one({'email': username})
-    print('Fetching user data for:', username)
+    # print('Fetching user data for:', username)
     
     if user_data:
         return dumps(user_data) 
@@ -382,7 +528,7 @@ def update_wordsearch_score():
             }
         }
     )
-    print(result)
+    # print(result)
     if result.modified_count > 0:
         return jsonify({"message": "Score and word updated successfully"})
     else:
@@ -394,11 +540,11 @@ def update_daily_data():
     data = request.get_json()
     username = data.get('username')
     completeData = data.get('data')
-    print(completeData)
+    # print(completeData)
     dailyData = completeData['dailyData']
     currdayobj = data.get('currDayObj')
-    print('Updating daily data for:', completeData)
-    print('Daily data:', dailyData)
+    # print('Updating daily data for:', completeData)
+    # print('Daily data:', dailyData)
     # return jsonify({'status': 'Daily data update endpoint reached'})
 
     if not username or not dailyData:
@@ -409,7 +555,7 @@ def update_daily_data():
         { "$set": { "dailyData": dailyData } },
         upsert=True
     )
-    print('Update result:', result)
+    # print('Update result:', result)
     
     FIELD_MAP = {
     "speaking": "speakingCompletion",
@@ -424,7 +570,7 @@ def update_daily_data():
         return jsonify({"error": "Email is required"}), 400
 
     update_fields = {}
-    print(currdayobj)
+    # print(currdayobj)
     for req_field, db_field in FIELD_MAP.items():
         if req_field in currdayobj:
             # Increment field
@@ -433,7 +579,7 @@ def update_daily_data():
 
     if not update_fields:
         return jsonify({"error": "No valid score fields to update"}), 400
-    print(update_fields)
+    # print(update_fields)
     # Increment the fields in MongoDB
     result = collection.update_one(
         {"email": username},
@@ -448,45 +594,45 @@ def update_daily_data():
     # return jsonify({'status': 'Daily data updated successfully'})
 
 
-@app.route('/students', methods=['GET'])
-def get_students():
-    class_arg = request.args.get('class')
-    section_arg = request.args.get('section')
-    print(class_arg, section_arg)
+# @app.route('/students', methods=['GET'])
+# def get_students():
+#     class_arg = request.args.get('class')
+#     section_arg = request.args.get('section')
+#     print(class_arg, section_arg)
 
-    if not class_arg or not section_arg:
-        return jsonify({"error": "Please provide class and section as query parameters"}), 400
+#     if not class_arg or not section_arg:
+#         return jsonify({"error": "Please provide class and section as query parameters"}), 400
 
-    pipeline = [
-        {
-            "$match": {
-                "role": "student",
-                "classes": class_arg,
-                "sections": section_arg
-            }
-        },
-        {
-            "$project": {
-                "_id": 0,
-                "id": "$id",
-                "username": {"$arrayElemAt": [{"$split": ["$email", "@"]}, 0]},
-                "fullName": "$fullName",
-                "class": {"$arrayElemAt": ["$classes", 0]},
-                "section": {"$arrayElemAt": ["$sections", 0]},
-                "speaking": "$speakingCompletion",
-                "pronunciation": "$pronunciationCompletion",
-                "vocabulary": "$vocabularyCompletion",
-                "grammar": "$grammarCompletion",
-                "story": "$storyCompletion",
-                "reflex": "$reflexCompletion",
-                "timeSpent": "$timeSpent",
-                "overall": "$overall"
-            }
-        }
-    ]
+#     pipeline = [
+#         {
+#             "$match": {
+#                 "role": "student",
+#                 "classes": class_arg,
+#                 "sections": section_arg
+#             }
+#         },
+#         {
+#             "$project": {
+#                 "_id": 0,
+#                 "id": "$id",
+#                 "username": {"$arrayElemAt": [{"$split": ["$email", "@"]}, 0]},
+#                 "fullName": "$fullName",
+#                 "class": {"$arrayElemAt": ["$classes", 0]},
+#                 "section": {"$arrayElemAt": ["$sections", 0]},
+#                 "speaking": "$speakingCompletion",
+#                 "pronunciation": "$pronunciationCompletion",
+#                 "vocabulary": "$vocabularyCompletion",
+#                 "grammar": "$grammarCompletion",
+#                 "story": "$storyCompletion",
+#                 "reflex": "$reflexCompletion",
+#                 "timeSpent": "$timeSpent",
+#                 "overall": "$overall"
+#             }
+#         }
+#     ]
 
-    results = list(collection.aggregate(pipeline))
-    return jsonify(results)
+#     results = list(collection.aggregate(pipeline))
+#     return jsonify(results)
 
 
 @app.route('/update-wordscramble-words', methods=['POST'])
@@ -546,7 +692,7 @@ def update_vocab():
     # section = data.get('section')
     email = data.get('email')
     words = data.get('words', [])
-    print(words)
+    # print(words)
 
     if not email:
         return jsonify({"message": "Missing classes or section"}), 400
@@ -685,7 +831,7 @@ def create_account():
     password = data.get('password')
     fullName = data.get('fullName')
     role = data.get('role')
-    print(classes, sections, password)
+    # print(classes, sections, password)
 
     if not email or not classes or not sections:
         return jsonify({'status': 'error', 'message': 'Missing fields'}), 400
@@ -698,6 +844,24 @@ def create_account():
         return jsonify({'status': 'error', 'message': 'Template student not found'}), 500
 
     new_doc = create_new_document(template, email, classes, sections, password, fullName, role)
+    if role == 'student':
+        new_doc['module'] = {
+        'speaking': { 'score': 0, 'sessionsCompleted': 0, 'targetSessions': 10, 'totalTime': 45 },
+        'vocabulary': { 'score': 0, 'sessionsCompleted': 0, 'targetSessions': 15, 'totalTime': 38 },
+        'grammar': { 'score': 0, 'sessionsCompleted': 0, 'targetSessions': 8, 'totalTime': 22 },
+        'pronunciation': { 'score': 0, 'sessionsCompleted': 0, 'targetSessions': 6, 'totalTime': 18 },
+        'reflex': { 'score': 0, 'sessionsCompleted': 0, 'targetSessions': 10, 'totalTime': 25 },
+        'story': { 'score': 0, 'sessionsCompleted': 0, 'targetSessions': 7, 'totalTime': 35 }
+        }
+    if role == 'teacher':
+        new_doc['module'] = {
+            'speakingTarget':10,
+            'vocabularyTarget':15,
+            'grammarTarget':8,
+            'pronunciationTarget':6,
+            'reflexTarget':10,
+            'storyTarget':7
+        }
     collection.insert_one(new_doc)
     # print(new_doc)
 
@@ -728,7 +892,7 @@ def get_assignments():
     #     a for a in assignments
     #     if a.get('targetClass') in teacher_classes and a.get('targetSection') in sections
     # ]
-    print(assignments)
+    # print(assignments)
     return jsonify({"assignments": assignments}), 200
 
 @app.route('/add-assignment', methods=['POST'])
@@ -905,7 +1069,7 @@ def delete_assignment():
 def student_overall_progress():
     data = request.json
     student_email = data.get("studentEmail")
-    print(student_email, data)
+    # print(student_email, data)
     if not student_email:
         return jsonify({"error": "Missing studentEmail"}), 400
 
