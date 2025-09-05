@@ -12,10 +12,60 @@ app = Flask(__name__)
 CORS(app)
 
 # MongoDB connection
-client = MongoClient("mongodb+srv://root:root@cluster0.jt307.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-db = client['school']
-collection = db['test']
+client = MongoClient("mongodb+srv://echo2k25ai_db_user:tzhpHeCX5BvwoWny@cluster0.wekdvif.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+db = client['mrms']
+collection = db['users']
+# storyCollection = db['stories']
 manager = APIKeyManager()
+
+# Get user progress (return only index for level)
+@app.route("/story-progress/<email>/<level>", methods=["GET"])
+def get_story_id(email, level):
+    user = collection.find_one({"email": email})
+    if not user:
+        return jsonify({"index": 0})  # default if new user
+
+    if level == "basic":
+        return jsonify({"index": user.get("storyEasyId", 0)})
+    elif level == "medium":
+        return jsonify({"index": user.get("storyMediumId", 0)})
+    elif level == "hard":
+        return jsonify({"index": user.get("storyHardId", 0)})
+    else:
+        return jsonify({"error": "Invalid level"}), 400
+
+
+# Update progress
+@app.route("/story-progress/update", methods=["POST"])
+def update_story_id():
+    print('cunfdfd')
+    data = request.json
+    email = data.get("email")
+    level = data.get("level")
+    story_index = data.get("storyIndex")
+
+    if not email or not level:
+        return jsonify({"error": "Missing email or level"}), 400
+
+    if level == "basic":
+        update_field = {"storyEasyId": story_index}
+    elif level == "medium":
+        update_field = {"storyMediumId": story_index}
+    elif level == "hard":
+        update_field = {"storyHardId": story_index}
+    else:
+        return jsonify({"error": "Invalid level"}), 400
+
+    collection.find_one_and_update(
+        {"email": email},
+        {"$set": update_field},
+        upsert=True,
+    )
+
+    return jsonify({"index": story_index}), 200
+
+
+
 
 @app.route('/updateModuleData', methods=['POST'])
 def updateModuleData():
@@ -178,10 +228,11 @@ def get_wordSearchId():
 def increment_wordSearch():
     username = request.args.get('email')
     level = request.args.get('level')
+    index = request.args.get('index')
     
     result = collection.update_one(
         {'email': username},
-        {"$inc": {"wordsearch."+level+".offset": 10}}
+        {"$set": {"wordsearch."+level+".offset": index}}
     )
     if result.modified_count > 0:
         # print('Incremented vocabularyArchade for:', username)
@@ -221,10 +272,11 @@ def get_vocabularyArchadeId():
 def increment_vocabularyArchadeId():
     username = request.args.get('email')
     level = request.args.get('level')
+    index = request.args.get('index')
     
     result = collection.update_one(
         {'email': username},
-        {"$inc": {"vocabularyArchade."+level+".offset": 10}}
+        {"$set": {"vocabularyArchade."+level+".offset": index}}
     )
     if result.modified_count > 0:
         # print('Incremented vocabularyArchade for:', username)
@@ -266,10 +318,11 @@ def get_word_scramble_id():
 def increment_wordScrambleId():
     username = request.args.get('email')
     level = request.args.get('level')
+    index = request.args.get('index')
     
     result = collection.update_one(
         {'email': username},
-        {"$inc": {"wordscramble."+level+"Offset": 10}}
+        {"$set": {"wordscramble."+level+"Offset": index}}
     )
     if result.modified_count > 0:
         # print('Incremented word scramble id for:', username)
@@ -281,6 +334,7 @@ def clear_wordScramble():
     email = request.args.get('email')
     level = request.args.get('level')
     user = collection.find_one({'email': email})
+    
     if user:
         result = collection.update_one(
             { 'email':email},
@@ -310,10 +364,11 @@ def get_pronunciation_mirror_id():
 def increment_pronunciation_mirror_id():
     username = request.args.get('email')
     level = request.args.get('level')
+    index = request.args.get('index')
 
     result = collection.update_one(
         {'email': username},
-        {"$inc": {"pronunciationMirror"+level+"Id": 1}}
+        {"$set": {"pronunciationMirror"+level+"Id": index}}
     )
     if result.modified_count > 0:
         # print('Incremented pronunciationMirrorId for:', username)
@@ -333,8 +388,9 @@ def get_vocabulary_trainer_id():
 def increment_vocabulary_trainer_id():
     username = request.args.get('email')
     level = request.args.get('level')
+    index = request.args.get('index')
     result = collection.update_one({'email': username},
-                                      {"$inc": {"vocabularyTrainer"+level+"Id": 10}})
+                                      {"$set": {"vocabularyTrainer"+level+"Id": index}})
     if result.modified_count > 0:
         # print('Incremented vocabularyTrainerId for:', username)
         return jsonify({'status': 'success', 'message': 'vocabularyTrainerId incremented'})
